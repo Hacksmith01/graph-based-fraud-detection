@@ -39,8 +39,12 @@ def load_prediction_artifacts() -> tuple[object, list[str], float]:
 
 def initialize_graph(dataset_path: str | Path = DEFAULT_DATASET_PATH, nrows: int = 100000) -> nx.DiGraph:
     """Create the starting transaction graph from the cleaned dataset."""
-    transactions, _ = preprocess_dataset(dataset_path=dataset_path, nrows=nrows)
-    return build_transaction_graph(transactions)
+    try:
+        transactions, _ = preprocess_dataset(dataset_path=dataset_path, nrows=nrows)
+        return build_transaction_graph(transactions)
+    except FileNotFoundError:
+        # Allow runtime prediction to still work even without the training dataset on disk.
+        return nx.DiGraph()
 
 
 def _build_prediction_row(
@@ -114,7 +118,10 @@ def predict_transaction(
         transaction_type=transaction_type,
     )
 
-    probability = float(model.predict_proba(prediction_row)[0][1])
+    # Predict, but guard against edge-cases in real-time inference.
+    proba = model.predict_proba(prediction_row)[0]
+    probability = float(proba[1]) if len(proba) > 1 else float(proba[0])
+
     prediction = int(probability > threshold)
 
     return {

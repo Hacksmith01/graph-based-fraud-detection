@@ -1,16 +1,45 @@
-# graph-based-fraud-detection
-This project explores fraud detection using graph-based techniques and machine learning models, leveraging relationships between entities to uncover hidden patterns that traditional tabular approaches often miss.
+# Graph-Based Fraud Detection
 
-## Current Features
+Graph-Based Fraud Detection in Financial Transaction Networks using Machine Learning is a Flask application that combines PaySim-trained fraud scoring, runtime transaction monitoring, account risk tracking, anomaly detection, and NetworkX/PyVis graph visualization.
 
-- Flask backend connected to the trained fraud model
-- User registration, login, logout, and user dashboard
-- Admin login and protected admin dashboard
-- SQLite persistence for users, transactions, and alerts
-- Balanced Random Forest training with graph features
-- Custom fraud threshold of `0.20`
-- Isolation Forest runtime anomaly alerts
-- PyVis graph export at `graph/graph.html`
+## Current Feature Set
+
+- User registration, login, logout, and protected user dashboard
+- Admin login and protected admin analytics dashboard
+- SQLite persistence for users, transactions, alerts, and account reputation
+- Balanced RandomForest fraud model trained on PaySim data only
+- Custom fraud threshold selected from validation candidates
+- ROC-AUC, precision-recall, confusion matrix, classification report, and feature importance outputs
+- Runtime Isolation Forest anomaly checks for unusual amounts
+- Explainable fraud alerts with human-readable reasons
+- NetworkX graph updates after every transaction
+- PyVis graph export with risk-colored nodes and amount-scaled edges
+- Community detection for suspicious account clusters
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A["PaySim CSV"] --> B["src/preprocessing.py"]
+  B --> C["src/graph_builder.py"]
+  C --> D["src/feature_engineering.py"]
+  D --> E["src/model.py"]
+  E --> F["models/model.pkl"]
+  E --> G["models/model_metadata.pkl"]
+  E --> H["graphs/*.png"]
+  I["Flask routes"] --> J["backend/services"]
+  J --> K["database/users.db"]
+  J --> L["runtime NetworkX graph"]
+  L --> M["graph/graph.html"]
+  I --> N["frontend/pages + static modules"]
+```
+
+Generated showcase asset placeholder:
+
+```text
+architecture.png
+screenshots/
+```
 
 ## Project Structure
 
@@ -19,6 +48,8 @@ backend/
   config.py
   factory.py
   runtime.py
+  auth_helpers.py
+  presenters.py
   routes/
     admin.py
     auth.py
@@ -27,11 +58,16 @@ backend/
   services/
     anomaly.py
     database.py
+    graph_intelligence.py
     graph_visualizer.py
     scoring.py
 
 frontend/
   pages/
+    admin.html
+    auth.html
+    dashboard.html
+    landing.html
   static/
     css/
     js/
@@ -40,11 +76,19 @@ src/
   preprocessing.py
   graph_builder.py
   feature_engineering.py
+  feature_importance.py
+  explainability.py
   model.py
   predict.py
+
+database/
+graph/
+graphs/
+models/
+tests/
 ```
 
-## Run Locally
+## Setup
 
 Install dependencies:
 
@@ -52,13 +96,13 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Train the model:
+Train and validate the model:
 
 ```bash
 python src/model.py
 ```
 
-Start the app:
+Start the Flask app:
 
 ```bash
 python app.py
@@ -70,30 +114,25 @@ Open:
 http://127.0.0.1:5000
 ```
 
-## Auth Pages
+## Dataset
 
-User registration:
+The training pipeline expects the local PaySim CSV and uses only:
 
-```text
-http://127.0.0.1:5000/register
+```python
+nrows=100000
 ```
 
-User login:
+Runtime users and transactions are not used for retraining. They are only used for live prediction, dashboards, account reputation, and alerts.
+
+## Main Pages
 
 ```text
-http://127.0.0.1:5000/login
-```
-
-User dashboard:
-
-```text
-http://127.0.0.1:5000/user-dashboard
-```
-
-Admin dashboard:
-
-```text
-http://127.0.0.1:5000/admin
+/                 transaction monitor
+/register         user registration
+/login            user login
+/user-dashboard   user dashboard
+/admin            admin login/dashboard
+/graph            latest PyVis graph export
 ```
 
 Development admin credentials:
@@ -103,86 +142,61 @@ Username: admin
 Password: GraphAdmin#2026
 ```
 
-## SQLite Database
-
-The database lives at:
+## API Endpoints
 
 ```text
-database/users.db
+POST /api/register
+POST /api/login
+POST /api/logout
+GET  /api/user/dashboard
+POST /api/predict
+POST /api/admin/login
+POST /api/admin/logout
+GET  /api/admin/status
+GET  /api/admin/transactions
 ```
 
-Tables:
+## Model Validation
 
-- `users`
-- `transactions`
-- `alerts`
+`src/model.py` trains a balanced RandomForest model with:
 
-Runtime users are used only for app tracking and predictions. The ML model is trained only on the PaySim dataset.
+- `class_weight="balanced"`
+- fraud rows plus a 3x normal sample
+- threshold comparison across `0.10`, `0.15`, `0.20`, and `0.25`
+- saved best threshold in `models/model_metadata.pkl`
 
-## Week 1/2 ML Core
-
-The ML pipeline uses the local PaySim CSV dataset with `nrows=100000`.
-
-Pipeline:
+Training generates:
 
 ```text
-Dataset -> preprocessing -> graph construction -> graph features -> RandomForest model -> predict_transaction()
+models/model.pkl
+models/feature_columns.pkl
+models/model_metadata.pkl
+models/feature_importance.json
+graphs/roc_curve.png
+graphs/precision_recall_curve.png
+graphs/confusion_matrix.png
+graphs/feature_importance.png
 ```
 
-Project structure added for the ML core:
+## Risk Levels
+
+Fraud probabilities are displayed as:
 
 ```text
-data/
-models/
-notebooks/
-src/
-  preprocessing.py
-  graph_builder.py
-  feature_engineering.py
-  model.py
-  predict.py
-requirements.txt
+0-20%    LOW
+20-50%   MEDIUM
+50-80%   HIGH
+80-100%  CRITICAL
 ```
 
-Train and save the baseline model:
+These labels appear in user history, admin history, alerts, and graph node styling.
+
+## Testing
+
+Run the test suite:
 
 ```bash
-python src/model.py
+python -m pytest
 ```
 
-Run a sample prediction:
-
-```bash
-python src/predict.py
-```
-
-The trained baseline model is saved to `models/model.pkl`, and the matching feature order is saved to `models/feature_columns.pkl`.
-
-## Run Frontend + Backend Together
-
-Start the Flask backend from the project root:
-
-```bash
-python app.py
-```
-
-Then open:
-
-```text
-http://127.0.0.1:5000
-```
-
-The transaction form calls the trained model through `/api/predict`.
-
-Admin page:
-
-```text
-http://127.0.0.1:5000/admin
-```
-
-Development admin credentials:
-
-```text
-Username: admin
-Password: GraphAdmin#2026
-```
+The project includes unit tests for preprocessing, graph building, prediction, anomaly detection, authentication, database services, and explainability.

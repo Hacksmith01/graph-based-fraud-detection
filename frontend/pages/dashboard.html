@@ -49,6 +49,13 @@
       </div>
     </section>
 
+    <section class="analytics-grid">
+      <article class="metric-card"><span>Total Sent</span><strong id="userTotalSent">$0</strong></article>
+      <article class="metric-card"><span>Total Received</span><strong id="userTotalReceived">$0</strong></article>
+      <article class="metric-card"><span>Average Amount</span><strong id="userAverageAmount">$0</strong></article>
+      <article class="metric-card"><span>Account Risk Level</span><strong id="userRiskLevel">LOW</strong></article>
+    </section>
+
     <!-- Scanner & Graph Grid -->
     <section class="workspace-grid">
       <form class="panel" id="transactionForm">
@@ -190,11 +197,20 @@
               <th>Amount</th>
               <th>Status</th>
               <th>Risk Score</th>
+              <th>Risk Level</th>
+              <th>Explanation</th>
             </tr>
           </thead>
           <tbody id="userTransactionsTable"></tbody>
         </table>
       </div>
+    </section>
+
+    <section class="panel" style="margin-top: 24px;">
+      <div class="panel-heading">
+        <div><p class="eyebrow">Explainable Monitoring</p><h2>Recent Alerts</h2></div>
+      </div>
+      <ul class="insight-list" id="userAlertsList"><li>No recent alerts.</li></ul>
     </section>
 
   </main>

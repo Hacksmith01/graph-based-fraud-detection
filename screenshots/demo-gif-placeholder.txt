@@ -1,0 +1,1 @@
+Add a short browser walkthrough GIF here after the UI polish pass.

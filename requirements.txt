@@ -8,5 +8,8 @@ Flask
 pyvis
 bcrypt
 matplotlib
+pygments
+pytest
+pytest-cov
 # sqlite3 is included with Python standard library.
 

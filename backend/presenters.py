@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
+from src.explainability import risk_level
+
 
 def public_user(user: dict | None) -> dict | None:
     if not user:
@@ -17,6 +21,12 @@ def public_user(user: dict | None) -> dict | None:
 
 def format_transaction(transaction: dict) -> dict:
     probability = float(transaction["probability"])
+    explanation = transaction.get("explanation", {})
+    if isinstance(explanation, str):
+        try:
+            explanation = json.loads(explanation)
+        except json.JSONDecodeError:
+            explanation = {}
     return {
         "id": transaction["id"],
         "timestamp": transaction["created_at"],
@@ -27,6 +37,8 @@ def format_transaction(transaction: dict) -> dict:
         "fraud_prediction": transaction["prediction"],
         "fraud_probability": probability,
         "risk_score": round(probability * 100, 2),
+        "risk_level": transaction.get("risk_level") or risk_level(probability),
+        "explanation": explanation,
         "anomaly_score": transaction.get("anomaly_score", 0),
         "username": transaction.get("username"),
     }

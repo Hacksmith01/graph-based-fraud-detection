@@ -17,7 +17,12 @@ async function loadUserDashboard() {
   setText("userTotalTransactions", result.metrics.total);
   setText("userFlaggedTransactions", result.metrics.flagged);
   setText("userPersonalRisk", `${result.metrics.personal_risk}%`);
+  setText("userTotalSent", formatCurrency(result.metrics.total_sent));
+  setText("userTotalReceived", formatCurrency(result.metrics.total_received));
+  setText("userAverageAmount", formatCurrency(result.metrics.average_amount));
+  setText("userRiskLevel", riskLevelFromScore(result.metrics.risk_score));
   renderUserTransactionTable(result.transactions);
+  renderUserAlerts(result.alerts || []);
 }
 
 function renderUserTransactionTable(transactions) {
@@ -27,12 +32,13 @@ function renderUserTransactionTable(transactions) {
   }
 
   if (!transactions.length) {
-    table.innerHTML = '<tr><td colspan="7">No transactions yet. Submit one from the monitor page.</td></tr>';
+    table.innerHTML = '<tr><td colspan="9">No transactions yet. Submit one from the monitor page.</td></tr>';
     return;
   }
 
   table.innerHTML = transactions.map((transaction) => {
     const riskClass = transaction.fraud_prediction === 1 ? "risk-high" : "risk-low";
+    const riskLevel = transaction.risk_level || "LOW";
     const predictionText = transaction.fraud_prediction === 1 ? "Fraud" : "Legitimate";
     return `
       <tr>
@@ -43,7 +49,28 @@ function renderUserTransactionTable(transactions) {
         <td>${formatCurrency(transaction.amount)}</td>
         <td class="${riskClass}">${predictionText}</td>
         <td>${formatPercent(transaction.fraud_probability)}</td>
+        <td class="risk-${riskLevel.toLowerCase()}">${escapeHtml(riskLevel)}</td>
+        <td>${escapeHtml((transaction.explanation?.reasons || []).join(", "))}</td>
       </tr>
     `;
   }).join("");
+}
+
+function renderUserAlerts(alerts) {
+  const list = document.getElementById("userAlertsList");
+  if (!list) return;
+  if (!alerts.length) {
+    list.innerHTML = "<li>No recent alerts.</li>";
+    return;
+  }
+  list.innerHTML = alerts.map((alert) => `
+    <li><strong>${escapeHtml(alert.alert_type)}</strong><span>${escapeHtml(alert.message)}</span></li>
+  `).join("");
+}
+
+function riskLevelFromScore(score) {
+  if (score < 20) return "LOW";
+  if (score < 50) return "MEDIUM";
+  if (score < 80) return "HIGH";
+  return "CRITICAL";
 }

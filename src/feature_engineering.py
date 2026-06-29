@@ -30,16 +30,21 @@ GRAPH_FEATURE_COLUMNS = [
 def compute_graph_features(graph: nx.DiGraph) -> dict[str, dict[str, float]]:
     """Compute degree, PageRank, and clustering coefficient per account."""
     if graph.number_of_nodes() == 0:
-        return {"degree": {}, "pagerank": {}, "clustering": {}}
+        return {"degree": {}, "pagerank": {}, "clustering": {}, "betweenness": {}}
 
     degree = dict(graph.degree())
     pagerank = nx.pagerank(graph, weight="weight", max_iter=100, tol=1e-04)
     clustering = nx.clustering(graph.to_undirected(), weight="weight")
+    if graph.number_of_nodes() <= 500:
+        betweenness = nx.betweenness_centrality(graph, weight="weight")
+    else:
+        betweenness = {}
 
     return {
         "degree": degree,
         "pagerank": pagerank,
         "clustering": clustering,
+        "betweenness": betweenness,
     }
 
 
@@ -84,14 +89,19 @@ def _find_suspicious_accounts(
     sender_col: str,
     receiver_col: str,
 ) -> pd.Series:
-    """Count high-risk neighbors using fraud labels when available."""
-    if "isFraud" not in df.columns:
+    """Count unusual neighbors without using the target label.
+
+    Using ``isFraud`` here would leak the answer into model features. Instead,
+    unusually large transactions form the behavioral suspicious-edge set.
+    """
+    if df.empty:
         return pd.Series(dtype=float)
 
-    fraud_rows = df[df["isFraud"] == 1]
+    high_amount_cutoff = float(df["amount"].quantile(0.99))
+    suspicious_rows = df[df["amount"] >= high_amount_cutoff]
     suspicious_edges = pd.concat([
-        fraud_rows[[sender_col, receiver_col]].rename(columns={sender_col: "account", receiver_col: "neighbor"}),
-        fraud_rows[[receiver_col, sender_col]].rename(columns={receiver_col: "account", sender_col: "neighbor"}),
+        suspicious_rows[[sender_col, receiver_col]].rename(columns={sender_col: "account", receiver_col: "neighbor"}),
+        suspicious_rows[[receiver_col, sender_col]].rename(columns={receiver_col: "account", sender_col: "neighbor"}),
     ])
 
     if suspicious_edges.empty:

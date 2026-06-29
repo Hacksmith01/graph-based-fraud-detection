@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,8 @@ def init_db() -> None:
                 probability REAL NOT NULL,
                 prediction INTEGER NOT NULL,
                 anomaly_score REAL DEFAULT 0,
+                risk_level TEXT DEFAULT 'LOW',
+                explanation TEXT DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
@@ -63,8 +66,27 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (transaction_id) REFERENCES transactions(id)
             );
+
+            CREATE TABLE IF NOT EXISTS account_reputation (
+                account_id TEXT PRIMARY KEY,
+                transaction_count INTEGER NOT NULL DEFAULT 0,
+                total_transaction_amount REAL NOT NULL DEFAULT 0,
+                average_transaction_amount REAL NOT NULL DEFAULT 0,
+                fraud_count INTEGER NOT NULL DEFAULT 0,
+                anomaly_count INTEGER NOT NULL DEFAULT 0,
+                account_risk_score REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
             """
         )
+        _ensure_column(connection, "transactions", "risk_level", "TEXT DEFAULT 'LOW'")
+        _ensure_column(connection, "transactions", "explanation", "TEXT DEFAULT '{}'")
+
+
+def _ensure_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def hash_password(password: str) -> str:
@@ -113,6 +135,12 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def get_user_by_account_id(account_id: str) -> dict[str, Any] | None:
+    with get_connection() as connection:
+        row = connection.execute("SELECT * FROM users WHERE account_id = ?", (account_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
     user = get_user_by_username(username)
     if user and verify_password(password, user["password_hash"]):
@@ -129,19 +157,107 @@ def save_transaction(
     probability: float,
     prediction: int,
     anomaly_score: float = 0.0,
+    risk_level: str = "LOW",
+    explanation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     init_db()
     with get_connection() as connection:
         cursor = connection.execute(
             """
             INSERT INTO transactions
-                (user_id, sender, receiver, amount, transaction_type, probability, prediction, anomaly_score, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (user_id, sender, receiver, amount, transaction_type, probability, prediction,
+                 anomaly_score, risk_level, explanation, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, sender, receiver, amount, transaction_type, probability, prediction, anomaly_score, utc_now()),
+            (
+                user_id, sender, receiver, amount, transaction_type, probability, prediction,
+                anomaly_score, risk_level, json.dumps(explanation or {}), utc_now(),
+            ),
         )
         transaction_id = cursor.lastrowid
     return get_transaction_by_id(transaction_id)
+
+
+def update_account_reputation(
+    account_id: str,
+    amount: float,
+    probability: float,
+    prediction: int,
+    is_anomaly: bool,
+) -> dict[str, Any]:
+    """Update aggregate account behavior after a transaction."""
+    init_db()
+    with get_connection() as connection:
+        current = connection.execute(
+            "SELECT * FROM account_reputation WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+
+        count = int(current["transaction_count"]) if current else 0
+        total_amount = float(current["total_transaction_amount"]) if current else 0.0
+        fraud_count = int(current["fraud_count"]) if current else 0
+        anomaly_count = int(current["anomaly_count"]) if current else 0
+        previous_risk = float(current["account_risk_score"]) if current else 0.0
+
+        new_count = count + 1
+        new_total = total_amount + float(amount)
+        new_fraud_count = fraud_count + int(prediction)
+        new_anomaly_count = anomaly_count + int(is_anomaly)
+        probability_score = float(probability) * 100
+        new_risk = min(100.0, ((previous_risk * count) + probability_score) / new_count)
+
+        connection.execute(
+            """
+            INSERT INTO account_reputation
+                (account_id, transaction_count, total_transaction_amount, average_transaction_amount,
+                 fraud_count, anomaly_count, account_risk_score, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(account_id) DO UPDATE SET
+                transaction_count = excluded.transaction_count,
+                total_transaction_amount = excluded.total_transaction_amount,
+                average_transaction_amount = excluded.average_transaction_amount,
+                fraud_count = excluded.fraud_count,
+                anomaly_count = excluded.anomaly_count,
+                account_risk_score = excluded.account_risk_score,
+                updated_at = excluded.updated_at
+            """,
+            (
+                account_id, new_count, new_total, new_total / new_count,
+                new_fraud_count, new_anomaly_count, new_risk, utc_now(),
+            ),
+        )
+
+    return get_account_reputation(account_id)
+
+
+def get_account_reputation(account_id: str) -> dict[str, Any]:
+    init_db()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM account_reputation WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+    if row:
+        return dict(row)
+    return {
+        "account_id": account_id,
+        "transaction_count": 0,
+        "total_transaction_amount": 0.0,
+        "average_transaction_amount": 0.0,
+        "fraud_count": 0,
+        "anomaly_count": 0,
+        "account_risk_score": 0.0,
+    }
+
+
+def list_account_reputations(limit: int = 10) -> list[dict[str, Any]]:
+    init_db()
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM account_reputation ORDER BY account_risk_score DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_transaction_by_id(transaction_id: int) -> dict[str, Any]:
@@ -197,6 +313,31 @@ def list_alerts(limit: int = 50) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def list_account_alerts(account_id: str, limit: int = 10) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM alerts WHERE account_id = ? ORDER BY id DESC LIMIT ?",
+            (account_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_account_transaction_statistics(account_id: str) -> dict[str, float | int]:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN sender = ? THEN amount ELSE 0 END), 0) AS total_sent,
+                COALESCE(SUM(CASE WHEN receiver = ? THEN amount ELSE 0 END), 0) AS total_received,
+                COALESCE(AVG(CASE WHEN sender = ? OR receiver = ? THEN amount END), 0) AS average_amount,
+                COUNT(CASE WHEN sender = ? OR receiver = ? THEN 1 END) AS transaction_count
+            FROM transactions
+            """,
+            (account_id, account_id, account_id, account_id, account_id, account_id),
+        ).fetchone()
+    return dict(row)
+
+
 def get_user_metrics() -> dict[str, int]:
     with get_connection() as connection:
         total_users = connection.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
@@ -223,3 +364,46 @@ def get_top_risky_accounts(limit: int = 5) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_admin_analytics() -> dict[str, list[dict[str, Any]] | int]:
+    """Return chart-ready daily trends and distribution data."""
+    with get_connection() as connection:
+        fraud_trend = connection.execute(
+            """
+            SELECT substr(created_at, 1, 10) AS date,
+                   COUNT(*) AS total,
+                   SUM(prediction) AS fraud
+            FROM transactions
+            GROUP BY date ORDER BY date DESC LIMIT 14
+            """
+        ).fetchall()
+        alert_trend = connection.execute(
+            """
+            SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS total
+            FROM alerts GROUP BY date ORDER BY date DESC LIMIT 14
+            """
+        ).fetchall()
+        user_growth = connection.execute(
+            """
+            SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS total
+            FROM users GROUP BY date ORDER BY date DESC LIMIT 14
+            """
+        ).fetchall()
+        distribution = connection.execute(
+            """
+            SELECT transaction_type AS label, COUNT(*) AS total
+            FROM transactions GROUP BY transaction_type ORDER BY total DESC
+            """
+        ).fetchall()
+        anomaly_count = connection.execute(
+            "SELECT COUNT(*) AS total FROM transactions WHERE anomaly_score < 0"
+        ).fetchone()["total"]
+
+    return {
+        "fraud_trend": [dict(row) for row in reversed(fraud_trend)],
+        "alert_trend": [dict(row) for row in reversed(alert_trend)],
+        "user_growth": [dict(row) for row in reversed(user_growth)],
+        "transaction_distribution": [dict(row) for row in distribution],
+        "anomaly_count": int(anomaly_count),
+    }

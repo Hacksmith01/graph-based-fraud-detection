@@ -1,0 +1,98 @@
+[
+  {
+    "feature": "step",
+    "importance": 0.12983075891837612
+  },
+  {
+    "feature": "oldbalanceDest",
+    "importance": 0.12224125173210414
+  },
+  {
+    "feature": "type_PAYMENT",
+    "importance": 0.10419991418233203
+  },
+  {
+    "feature": "oldbalanceOrg",
+    "importance": 0.09709639111746333
+  },
+  {
+    "feature": "newbalanceOrig",
+    "importance": 0.08877333089428976
+  },
+  {
+    "feature": "receiver_total_incoming_amount",
+    "importance": 0.08027589111142867
+  },
+  {
+    "feature": "type_TRANSFER",
+    "importance": 0.07128679633457259
+  },
+  {
+    "feature": "sender_total_outgoing_amount",
+    "importance": 0.05008171980951016
+  },
+  {
+    "feature": "amount",
+    "importance": 0.04700479743101226
+  },
+  {
+    "feature": "newbalanceDest",
+    "importance": 0.04598428566929862
+  },
+  {
+    "feature": "receiver_pagerank",
+    "importance": 0.03697340815005808
+  },
+  {
+    "feature": "receiver_transaction_frequency",
+    "importance": 0.03451173021093441
+  },
+  {
+    "feature": "receiver_degree",
+    "importance": 0.0337864451833518
+  },
+  {
+    "feature": "type_CASH_OUT",
+    "importance": 0.02849439009232931
+  },
+  {
+    "feature": "type_CASH_IN",
+    "importance": 0.021861846343519606
+  },
+  {
+    "feature": "receiver_suspicious_neighbor_count",
+    "importance": 0.005282874129552082
+  },
+  {
+    "feature": "sender_suspicious_neighbor_count",
+    "importance": 0.0018446058717678444
+  },
+  {
+    "feature": "type_DEBIT",
+    "importance": 0.0004695628180993366
+  },
+  {
+    "feature": "isFlaggedFraud",
+    "importance": 0.0
+  },
+  {
+    "feature": "sender_degree",
+    "importance": 0.0
+  },
+  {
+    "feature": "sender_pagerank",
+    "importance": 0.0
+  },
+  {
+    "feature": "sender_transaction_frequency",
+    "importance": 0.0
+  },
+  {
+    "feature": "sender_clustering",
+    "importance": 0.0
+  },
+  {
+    "feature": "receiver_clustering",
+    "importance": 0.0
+  }
+]

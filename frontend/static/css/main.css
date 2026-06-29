@@ -511,9 +511,21 @@ canvas {
   text-decoration: underline;
 }
 
+.risk-low { color: var(--success); }
+.risk-medium { color: var(--warning); }
+.risk-high { color: var(--danger); }
+.risk-critical { color: #ff3b3b; font-weight: 800; }
+
+.analytics-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
-  .workspace-grid, .bottom-grid {
+  .workspace-grid, .bottom-grid, .analytics-chart-grid {
     grid-template-columns: 1fr;
   }
 }

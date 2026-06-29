@@ -75,8 +75,9 @@
           </div>
           <div>
             <span>F1-score</span>
-            <strong>0.61</strong>
+            <strong id="modelF1">0.00</strong>
           </div>
+          <div><span>ROC-AUC</span><strong id="modelRocAuc">0.00</strong></div>
         </div>
       </section>
 
@@ -116,6 +117,25 @@
           <span>Model source</span>
           <strong>model.pkl</strong>
         </article>
+        <article class="metric-card"><span>Anomalies</span><strong id="adminAnomalyCount">0</strong></article>
+      </section>
+
+      <section class="workspace-grid bottom-grid">
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Graph intelligence</p><h2>Suspicious clusters</h2></div></div>
+          <ul class="insight-list" id="suspiciousClustersList"><li>No suspicious clusters.</li></ul>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Model explainability</p><h2>Feature importance</h2></div></div>
+          <ul class="insight-list" id="featureImportanceList"><li>Run model training to generate importance data.</li></ul>
+        </section>
+      </section>
+
+      <section class="analytics-chart-grid">
+        <section class="panel"><h2>Fraud trend</h2><canvas id="fraudTrendChart" height="160"></canvas></section>
+        <section class="panel"><h2>Alert trend</h2><canvas id="alertTrendChart" height="160"></canvas></section>
+        <section class="panel"><h2>User growth</h2><canvas id="userGrowthChart" height="160"></canvas></section>
+        <section class="panel"><h2>Transaction distribution</h2><canvas id="transactionDistributionChart" height="160"></canvas></section>
       </section>
 
       <section class="workspace-grid">
@@ -212,6 +232,8 @@
                 <th>Amount</th>
                 <th>Prediction</th>
                 <th>Probability</th>
+                <th>Risk Level</th>
+                <th>Explanation</th>
               </tr>
             </thead>
             <tbody id="adminTransactionsTable"></tbody>

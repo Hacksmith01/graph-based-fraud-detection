@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from backend.services.database import create_alert, list_transactions
 
 
@@ -36,11 +38,19 @@ def adjust_runtime_probability(
 def generate_alerts(transaction: dict, is_anomaly: bool) -> list[dict]:
     """Create alert rows for high-risk or unusual transactions."""
     alerts = []
+    explanation = transaction.get("explanation", {})
+    if isinstance(explanation, str):
+        try:
+            explanation = json.loads(explanation)
+        except json.JSONDecodeError:
+            explanation = {}
+    reasons = explanation.get("reasons", []) if isinstance(explanation, dict) else []
+    reason_text = f" Reasons: {', '.join(reasons)}." if reasons else ""
 
     if transaction["prediction"] == 1:
         alerts.append({
             "type": "High-risk transaction detected",
-            "message": f"{transaction['sender']} sent {transaction['amount']:.2f} to {transaction['receiver']}.",
+            "message": f"{transaction['sender']} sent {transaction['amount']:.2f} to {transaction['receiver']}.{reason_text}",
             "severity": "high",
         })
 
